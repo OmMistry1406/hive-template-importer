@@ -65,6 +65,7 @@ npm test              # 60 parser, database and sign-in tests, on real Postgres 
 npm run build
 npx playwright install chromium-headless-shell
 npm run test:e2e      # 23 browser tests: workflow, sign-in and failure cases
+LIVE_USER=... LIVE_PASSWORD=... npm run test:live   # 3 read-only checks on the deployed app
 npm run typecheck
 npm run lint
 ```
