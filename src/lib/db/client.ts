@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { PGlite } from "@electric-sql/pglite";
 import { Pool, type PoolClient } from "pg";
@@ -85,6 +85,7 @@ export async function applyMigrations(run: (sql: string) => Promise<unknown>, q:
 
 export async function createPgliteDb(dataDir?: string): Promise<Db> {
   const { PGlite } = await import("@electric-sql/pglite");
+  if (dataDir) mkdirSync(dataDir, { recursive: true });
   const pg = await PGlite.create(dataDir ? { dataDir } : undefined);
   const db = pgliteDb(pg);
   await applyMigrations((sql) => pg.exec(sql), db);
@@ -103,6 +104,9 @@ export function getDb(): Promise<Db> {
       throw new Error("DATABASE_URL is not set. Add it in the Vercel project settings.");
     }
     return createPgliteDb(process.env.PGLITE_DIR ?? path.join(process.cwd(), ".data", "pglite"));
-  })();
+  })().catch((error) => {
+    shared.__db = undefined;
+    throw error;
+  });
   return shared.__db;
 }

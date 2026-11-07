@@ -118,7 +118,9 @@ export function CommentCard({
             {comment.textHtml ? (
               <div className="comment-html" dangerouslySetInnerHTML={{ __html: comment.textHtml }} />
             ) : (
-              <span className="text-sm text-muted">No comment text. Click to add.</span>
+              <span className="text-sm text-muted">
+                {type === "defect" || type === "limit" ? "No text in the export. Click to add." : "Add text (optional)"}
+              </span>
             )}
           </div>
         )}

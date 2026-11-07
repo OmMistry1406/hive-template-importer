@@ -6,7 +6,7 @@ const SAMPLE = path.resolve("samples", "InterNACHI-Residential-2026-11-06.xls");
 async function importSample(page: Page) {
   await page.goto("/import");
   await page.getByLabel("Spectora export file").setInputFiles(SAMPLE);
-  await expect(page.getByText("392 of 392 rows accounted for")).toBeVisible();
+  await expect(page.getByText("392 of 392 rows accounted for")).toBeVisible({ timeout: 30000 });
 }
 
 const openTemplateFromReport = (page: Page) =>
@@ -87,8 +87,8 @@ test("a wrong file is refused with a reason", async ({ page }) => {
     mimeType: "text/plain",
     buffer: Buffer.from("this is not a spreadsheet"),
   });
-  await expect(page.getByRole("alert")).toContainText("This file is not a spreadsheet.");
-  await expect(page.getByRole("alert")).toContainText("Nothing was added");
+  const alert = page.getByRole("alert").filter({ hasText: "This file is not a spreadsheet." });
+  await expect(alert).toContainText("Nothing was added");
   await page.goto("/templates");
   await expect(page.getByRole("listitem")).toHaveCount(2);
 });

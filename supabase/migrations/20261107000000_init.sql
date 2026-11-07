@@ -139,4 +139,17 @@ alter table sections enable row level security;
 alter table items enable row level security;
 alter table comments enable row level security;
 
+-- Supabase grants new functions to its API roles directly, so revoking from
+-- public alone is not enough. These roles do not exist on plain Postgres.
 revoke execute on function copy_template(uuid, text) from public;
+do $$
+declare
+  api_role text;
+begin
+  foreach api_role in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = api_role) then
+      execute format('revoke execute on function copy_template(uuid, text) from %I', api_role);
+    end if;
+  end loop;
+end;
+$$;

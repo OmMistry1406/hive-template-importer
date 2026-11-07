@@ -142,12 +142,6 @@ export default async function ReportPage({ params, searchParams }: PageProps<"/t
         })}
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-lg font-semibold">Every row of your file</h2>
-        <p className="text-sm text-muted">Shows where each row went and whether it has changed since import.</p>
-        <ReportRows rows={rows} templateId={id} />
-      </section>
-
       <section className="mt-8 text-sm text-muted">
         <h2 className="text-lg font-semibold text-foreground">What this format cannot carry</h2>
         <p className="mt-1">Spectora documents that these are not part of a spreadsheet export or import, so re-check them by hand:</p>
@@ -161,6 +155,13 @@ export default async function ReportPage({ params, searchParams }: PageProps<"/t
           <li>Default photos arrive only as addresses. They are stored and flagged, but the images are not copied.</li>
         </ul>
       </section>
+
+      <section className="mt-8">
+        <h2 className="text-lg font-semibold">Every row of your file</h2>
+        <p className="text-sm text-muted">Shows where each row went and whether it has changed since import.</p>
+        <ReportRows rows={rows} templateId={id} />
+      </section>
+
     </main>
   );
 }
