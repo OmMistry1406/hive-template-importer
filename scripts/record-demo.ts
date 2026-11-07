@@ -1,6 +1,7 @@
-// Records a captioned product walkthrough against a running local server.
+// Records a captioned, narrated product walkthrough against a running local
+// server. Narration uses Windows' built-in speech voice (scripts/tts.ps1).
 // Usage: start the app on DEMO_URL, then `npx tsx scripts/record-demo.ts`.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import { chromium, type Locator, type Page } from "@playwright/test";
@@ -12,6 +13,31 @@ const OUT = path.resolve("submission");
 const RAW = path.join(OUT, "raw");
 const SAMPLE = path.resolve("samples", "InterNACHI-Residential-2026-11-06.xls");
 const SIZE = { width: 1440, height: 900 };
+const VOICE = path.join(OUT, "voice");
+const FFMPEG = ffmpeg as unknown as string;
+
+type Cue = { file: string; atMs: number };
+const cues: Cue[] = [];
+let startedAt = 0;
+
+function speechFile(text: string): { file: string; ms: number } {
+  const file = path.join(VOICE, `${String(cues.length).padStart(2, "0")}.wav`);
+  execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.resolve("scripts", "tts.ps1")], {
+    env: { ...process.env, TTS_TEXT: text, TTS_OUT: file },
+    stdio: "ignore",
+  });
+  const probe = spawnSync(FFMPEG, ["-i", file], { encoding: "utf8" }).stderr;
+  const [, h, m, sec] = probe.match(/Duration: (\d+):(\d+):([\d.]+)/) ?? [];
+  return { file, ms: Math.round(((Number(h) * 60 + Number(m)) * 60 + Number(sec)) * 1000) };
+}
+
+// Speaks the text and holds the scene until both the minimum time and the
+// sentence have finished, so narration never overlaps.
+async function say(page: Page, text: string, minMs: number) {
+  const { file, ms } = speechFile(text);
+  cues.push({ file, atMs: Date.now() - startedAt });
+  await page.waitForTimeout(Math.max(minMs, ms + 450));
+}
 
 const CAPTION_STYLE = [
   "position:fixed", "left:50%", "bottom:28px", "transform:translateX(-50%)", "z-index:99999",
@@ -20,7 +46,7 @@ const CAPTION_STYLE = [
   "box-shadow:0 10px 30px rgba(0,0,0,.25)", "pointer-events:none",
 ].join(";");
 
-async function caption(page: Page, title: string, detail = "", ms = 3200) {
+async function caption(page: Page, title: string, detail = "", ms = 3200, spoken?: string) {
   await page.evaluate(
     ([t, d, style]) => {
       let el = document.getElementById("demo-caption");
@@ -44,10 +70,10 @@ async function caption(page: Page, title: string, detail = "", ms = 3200) {
     },
     [title, detail, CAPTION_STYLE] as const,
   );
-  await page.waitForTimeout(ms);
+  await say(page, spoken ?? [title, detail].filter(Boolean).join(". "), ms);
 }
 
-async function card(page: Page, title: string, lines: string[], ms = 5000) {
+async function card(page: Page, title: string, lines: string[], ms = 5000, spoken?: string) {
   await page.evaluate(
     ([t, ls]) => {
       const el = document.createElement("div");
@@ -70,7 +96,7 @@ async function card(page: Page, title: string, lines: string[], ms = 5000) {
     },
     [title, lines] as const,
   );
-  await page.waitForTimeout(ms);
+  await say(page, spoken ?? [title, ...lines].join(". "), ms);
   await page.evaluate(() => document.getElementById("demo-card")?.remove());
 }
 
@@ -89,10 +115,13 @@ async function spotlight(locator: Locator, ms = 1800) {
 
 async function main() {
   rmSync(RAW, { recursive: true, force: true });
+  rmSync(VOICE, { recursive: true, force: true });
   mkdirSync(RAW, { recursive: true });
+  mkdirSync(VOICE, { recursive: true });
   const browser = await chromium.launch({ slowMo: 60 });
   const context = await browser.newContext({ viewport: SIZE, recordVideo: { dir: RAW, size: SIZE } });
   const page = await context.newPage();
+  startedAt = Date.now();
 
   // 1. Introduction
   if (!/^http:\/\/(localhost|127\.0\.0\.1)/.test(BASE)) throw new Error("Record against a local server only.");
@@ -100,7 +129,7 @@ async function main() {
   await card(page, "Spectora Template Importer", [
     "Hive Inspect Forward Deployed Engineer assignment",
     "Import a Spectora template, prove nothing was lost, then edit and copy it.",
-  ], 6000);
+  ], 6000, "This is the Spectora template importer, built for the Hive Inspect Forward Deployed Engineer assignment. It imports a Spectora template, proves nothing was lost, and then lets the inspector edit and copy it.");
   await caption(page, "The customer: an inspection company leaving Spectora", "Four years of tuned template. They will not retype it.", 4200);
   await page.mouse.wheel(0, 650);
   await caption(page, "Import, verify, edit, copy", "", 3000);
@@ -194,9 +223,9 @@ async function main() {
 
   await card(page, "Built for a customer who will not retype", [
     "Next.js on Vercel, Supabase Postgres, schema managed with the Supabase CLI",
-    "60 unit and database tests, 22 browser tests, including hostile HTML and forged sessions",
+    "60 unit and database tests, 23 browser tests, including hostile HTML and forged sessions",
     "Repo: github.com/OmMistry1406/hive-template-importer",
-  ], 7000);
+  ], 7000, "Built with Next.js on Vercel and Supabase Postgres. Sixty unit and database tests, and twenty-three browser tests, cover the workflow and the failure cases. Thanks for watching.");
 
   await context.close();
   await browser.close();
@@ -205,11 +234,17 @@ async function main() {
   const webmPath = path.join(OUT, "walkthrough-demo.webm");
   renameSync(path.join(RAW, webm), webmPath);
   const mp4 = path.join(OUT, "walkthrough-demo.mp4");
-  execFileSync(ffmpeg as unknown as string, [
-    "-y", "-i", webmPath, "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-    "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4,
+  const delays = cues.map((c, i) => `[${i + 1}:a]adelay=${c.atMs}|${c.atMs}[a${i}]`).join(";");
+  const mix = `${cues.map((_, i) => `[a${i}]`).join("")}amix=inputs=${cues.length}:normalize=0,loudnorm=I=-16:TP=-1.5[voice]`;
+  execFileSync(FFMPEG, [
+    "-y", "-i", webmPath, ...cues.flatMap((c) => ["-i", c.file]),
+    "-filter_complex", `${delays};${mix}`,
+    "-map", "0:v", "-map", "[voice]",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", mp4,
   ], { stdio: "ignore" });
   rmSync(RAW, { recursive: true, force: true });
+  rmSync(VOICE, { recursive: true, force: true });
   console.log(`Saved ${mp4}`);
 }
 

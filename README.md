@@ -77,7 +77,7 @@ npm run lint
 
 ```sh
 npm run build
-DATABASE_URL= PGLITE_DIR=.data/demo npx next start -p 3200
+DATABASE_URL= DEMO_USERNAME= DEMO_PASSWORD= SESSION_SECRET= PGLITE_DIR=.data/demo npx next start -p 3200
 npx tsx scripts/record-demo.ts
 ```
 

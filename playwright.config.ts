@@ -34,7 +34,8 @@ export default defineConfig({
   webServer: {
     command: "npm run start -- -p 3100",
     url: "http://localhost:3100/login",
-    env: { PGLITE_DIR: dataDir, DATABASE_URL: "" },
+    // Empty values stop .env.local leaking live credentials into local tests.
+    env: { PGLITE_DIR: dataDir, DATABASE_URL: "", DEMO_USERNAME: "", DEMO_PASSWORD: "", SESSION_SECRET: "" },
     reuseExistingServer: false,
     timeout: 60000,
   },

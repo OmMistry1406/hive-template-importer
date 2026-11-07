@@ -8,8 +8,9 @@ const password = process.env.LIVE_PASSWORD ?? "";
 test("home page is public and plays the walkthrough", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("moved without retyping");
-  const ok = await page.evaluate(async () => (await fetch("/media/walkthrough.mp4", { method: "HEAD" })).ok);
-  expect(ok).toBe(true);
+  const video = await page.request.head("/media/walkthrough.mp4", { timeout: 30000 });
+  expect(video.ok()).toBe(true);
+  expect(video.headers()["content-type"]).toContain("video/mp4");
 });
 
 test("wrong password is refused", async ({ page }) => {
