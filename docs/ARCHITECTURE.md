@@ -15,7 +15,7 @@ Browser upload
   -> import report
 ```
 
-Editing goes through server actions. The browser never holds database credentials.
+Editing goes through server actions. The browser never holds database credentials. Signed-out visitors see only the home page and sign-in.
 
 ## Stack
 
@@ -60,7 +60,10 @@ Key decisions:
 
 ## Security
 
-- No login: this is a single-workspace demo, so anyone with the URL can edit it. Real customer use needs authentication and per-company data.
+- One shared reviewer sign-in. `src/proxy.ts` sends signed-out requests to `/login`, and every server action and the upload route check the session again.
+- Sessions are HMAC-signed, HTTP-only, `SameSite=Lax` cookies that expire after 7 days. Credentials are compared in constant time, and the post-sign-in redirect only allows same-site paths.
+- On Vercel, missing sign-in variables disable sign-in rather than falling back to local defaults.
+- Real customers would need per-company accounts and data separation.
 - Row level security is on with no policies, so Supabase's public REST API returns nothing. The app connects server-side.
 - `copy_template` execute rights are revoked from `public`.
 - Comment HTML is sanitised on the server before reaching the browser: scripts, event handlers and `javascript:` links are removed.

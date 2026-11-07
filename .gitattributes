@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.xls binary
+*.mp4 binary
+*.jpg binary
+*.png binary
+*.ico binary
