@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { currentUser } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 import { importSpectoraFile } from "@/lib/import/run";
 import { ImportFailure } from "@/lib/import/types";
@@ -10,6 +11,7 @@ const fail = (status: number, code: string, message: string, detail?: string) =>
   NextResponse.json({ code, message, detail }, { status });
 
 export async function POST(request: Request) {
+  if (!(await currentUser())) return fail(401, "unauthenticated", "Sign in to continue.");
   let file: FormDataEntryValue | null;
   try {
     file = (await request.formData()).get("file");

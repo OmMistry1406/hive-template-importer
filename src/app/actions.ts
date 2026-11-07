@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { currentUser } from "@/lib/auth/server";
 import { getDb } from "@/lib/db/client";
 import {
   NotFound,
@@ -25,27 +26,29 @@ const COMMENT_TYPES = ["info", "limit", "defect"];
 
 class Invalid extends Error {}
 
-function id(value: string) {
-  if (!UUID.test(value)) throw new Invalid("That record could not be found.");
+function id(value: unknown) {
+  if (typeof value !== "string" || !UUID.test(value)) throw new Invalid("That record could not be found.");
   return value;
 }
 
-function name(value: string, label: string) {
+function name(value: unknown, label: string) {
+  if (typeof value !== "string") throw new Invalid(`${label} is not valid.`);
   const trimmed = value.trim();
   if (!trimmed) throw new Invalid(`${label} cannot be empty.`);
   if (trimmed.length > MAX_NAME) throw new Invalid(`${label} is too long.`);
-  return value;
+  return trimmed;
 }
 
 async function run<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   try {
+    if (!(await currentUser())) throw new Invalid("Your session has ended. Sign in again to keep editing.");
     return { ok: true, value: await fn() };
   } catch (error) {
     if (error instanceof Invalid || error instanceof NotFound) {
       return { ok: false, error: error.message };
     }
     console.error(error);
-    return { ok: false, error: "The server could not save this. Your text is still here; try again." };
+    return { ok: false, error: "The server could not save this change." };
   }
 }
 
@@ -72,6 +75,7 @@ export async function saveCommentName(commentId: string, value: string) {
 
 export async function saveCommentText(commentId: string, html: string) {
   return run(async () => {
+    if (typeof html !== "string") throw new Invalid("That comment text is not valid.");
     if (html.length > MAX_TEXT) throw new Invalid("This comment is too long to save.");
     const textHtml = sanitizeEdit(html);
     await updateComment(await getDb(), id(commentId), { textHtml });
@@ -81,7 +85,7 @@ export async function saveCommentText(commentId: string, html: string) {
 
 export async function saveCommentType(commentId: string, value: string) {
   return run(async () => {
-    if (!COMMENT_TYPES.includes(value)) throw new Invalid("Unknown comment type.");
+    if (typeof value !== "string" || !COMMENT_TYPES.includes(value)) throw new Invalid("Unknown comment type.");
     await updateComment(await getDb(), id(commentId), { commentType: value });
   });
 }
