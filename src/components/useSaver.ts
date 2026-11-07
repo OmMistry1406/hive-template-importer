@@ -1,38 +1,60 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ActionResult } from "@/app/actions";
 
 export type SaveState =
   | { kind: "idle" }
   | { kind: "saving" }
   | { kind: "saved" }
-  | { kind: "failed"; error: string; retry: () => void };
+  | { kind: "failed"; error: string; count: number; retry: () => void };
 
+type Failure = { error: string; retry: () => void };
+type Handlers<T> = { onSuccess?: (value: T) => void; onFailure?: () => void };
+
+// Failures are tracked per change, so a later successful save cannot hide an
+// earlier failed one. Retry re-runs the whole change, including its follow-up.
 export function useSaver() {
-  const [state, setState] = useState<SaveState>({ kind: "idle" });
-  const inFlight = useRef(0);
+  const [pending, setPending] = useState(0);
+  const [failures, setFailures] = useState<ReadonlyMap<string, Failure>>(new Map());
+  const [savedOnce, setSavedOnce] = useState(false);
 
-  const save = useCallback(async <T,>(fn: () => Promise<ActionResult<T>>): Promise<ActionResult<T>> => {
-    const attempt = async (): Promise<ActionResult<T>> => {
-      inFlight.current++;
-      setState({ kind: "saving" });
-      let result: ActionResult<T>;
-      try {
-        result = await fn();
-      } catch {
-        result = { ok: false, error: "Could not reach the server. Try again." };
-      }
-      inFlight.current--;
-      if (!result.ok) {
-        setState({ kind: "failed", error: result.error, retry: () => void attempt() });
-      } else if (inFlight.current === 0) {
-        setState({ kind: "saved" });
-      }
-      return result;
-    };
-    return attempt();
+  const save = useCallback(async function run<T>(
+    key: string,
+    fn: () => Promise<ActionResult<T>>,
+    handlers: Handlers<T> = {},
+  ): Promise<ActionResult<T>> {
+    setPending((n) => n + 1);
+    let result: ActionResult<T>;
+    try {
+      result = await fn();
+    } catch {
+      result = { ok: false, error: "Could not reach the server." };
+    }
+    setPending((n) => n - 1);
+    setFailures((previous) => {
+      const next = new Map(previous);
+      if (result.ok) next.delete(key);
+      else next.set(key, { error: result.error, retry: () => void run(key, fn, handlers) });
+      return next;
+    });
+    if (result.ok) {
+      setSavedOnce(true);
+      handlers.onSuccess?.(result.value);
+    } else {
+      handlers.onFailure?.();
+    }
+    return result;
   }, []);
+
+  const [first] = failures.values();
+  const state: SaveState = first
+    ? { kind: "failed", error: first.error, count: failures.size, retry: () => failures.forEach((f) => f.retry()) }
+    : pending > 0
+      ? { kind: "saving" }
+      : savedOnce
+        ? { kind: "saved" }
+        : { kind: "idle" };
 
   return { state, save };
 }

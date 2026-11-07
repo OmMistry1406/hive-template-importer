@@ -1,5 +1,5 @@
+import he from "he";
 import { CORE_COLUMNS, normalizeHeader, type CoreColumn } from "./columns";
-import { decodeName, splitOptions } from "./parse";
 import type { Disposition, Verification } from "./types";
 
 export type StoredComment = {
@@ -29,8 +29,21 @@ export type StoredSourceRow = {
   disposition: Disposition;
 };
 
+// A second, independent decoder (the parser has its own), so a decoding bug
+// in one is caught by the other instead of agreeing with itself.
+const decode = (raw: string) => {
+  try {
+    return he.decode(raw, { strict: true });
+  } catch {
+    return `\u0000undecodable:${raw}`;
+  }
+};
+
+// Option text must survive splitting: same characters, separators aside.
+const optionContent = (text: string) => text.replace(/[\s,]/g, "");
+
 // Compares what the database now holds with the untouched source rows. It
-// must not reuse parser state, or a parser bug would agree with itself.
+// does not reuse parser state, or a parser bug would agree with itself.
 export function verifyStoredTemplate(
   template: StoredTemplate,
   sourceRows: StoredSourceRow[],
@@ -52,57 +65,59 @@ export function verifyStoredTemplate(
     if (expected !== actual) result.mismatches.push({ rowNumber, field, expected, actual });
   };
 
-  const flat = template.sections.flatMap((section) =>
-    section.items.flatMap((item) =>
-      item.comments.map((comment) => ({ section, item, comment })),
-    ),
-  );
-  const expectedRows = sourceRows
-    .filter((r) => r.disposition === "mapped")
+  // Structure: walking the rows in file order, a new item starts exactly where
+  // the section or item name changes, and every row lands in that item.
+  const slots = template.sections.flatMap((section) => section.items.map((item) => ({ section, item })));
+  const placed = sourceRows
+    .filter((r) => r.disposition === "mapped" || r.disposition === "structure_only")
     .sort((a, b) => a.rowNumber - b.rowNumber);
-
-  if (flat.length !== expectedRows.length) {
-    result.mismatches.push({
-      rowNumber: 0,
-      field: "comment count",
-      expected: String(expectedRows.length),
-      actual: String(flat.length),
-    });
+  let index = -1;
+  let previousKey: string | null = null;
+  let previousSection: string | null = null;
+  let sectionChanges = 0;
+  for (const row of placed) {
+    const sectionRaw = cell(row, "section");
+    const key = `${sectionRaw}\u0000${cell(row, "item")}`;
+    if (key !== previousKey) index++;
+    if (sectionRaw !== previousSection) sectionChanges++;
+    previousKey = key;
+    previousSection = sectionRaw;
+    const slot = slots[index];
+    if (!slot) {
+      result.rowsUnaccounted.push(row.rowNumber);
+      continue;
+    }
+    check(row.rowNumber, "section", decode(sectionRaw), slot.section.name);
+    check(row.rowNumber, "item", decode(cell(row, "item")), slot.item.name);
+    if (row.disposition === "mapped" && !slot.item.comments.some((c) => c.sourceRowId === row.id)) {
+      result.mismatches.push({ rowNumber: row.rowNumber, field: "grouping", expected: "comment in this item", actual: "comment elsewhere" });
+    }
   }
+  check(0, "item count", String(index + 1), String(slots.length));
+  check(0, "section count", String(sectionChanges), String(template.sections.length));
 
-  expectedRows.forEach((row, index) => {
-    const stored = flat[index];
-    if (!stored || stored.comment.sourceRowId !== row.id) {
+  // Content: every mapped row, in file order, against the stored comment.
+  const flat = template.sections.flatMap((section) => section.items.flatMap((item) => item.comments));
+  const expectedRows = placed.filter((r) => r.disposition === "mapped");
+  check(0, "comment count", String(expectedRows.length), String(flat.length));
+
+  const coreHeaders = new Set((Object.keys(CORE_COLUMNS) as CoreColumn[]).map(headerFor));
+  expectedRows.forEach((row, i) => {
+    const comment = flat[i];
+    if (!comment || comment.sourceRowId !== row.id) {
       result.rowsUnaccounted.push(row.rowNumber);
       return;
     }
     result.rowsChecked++;
-    const { section, item, comment } = stored;
     const n = row.rowNumber;
-    check(n, "section", decodeName(cell(row, "section")), section.name);
-    check(n, "item", decodeName(cell(row, "item")), item.name);
-    check(n, "comment name", decodeName(cell(row, "commentName")), comment.name);
+    check(n, "comment name", decode(cell(row, "commentName")), comment.name);
     check(n, "comment text", cell(row, "commentText"), comment.textHtml ?? "");
     check(n, "comment type", cell(row, "commentType"), comment.commentType ?? "");
     check(n, "category", cell(row, "category"), comment.category ?? "");
     check(n, "recommendation", cell(row, "recommendation"), comment.recommendation ?? "");
     check(n, "answer type", cell(row, "answerType"), comment.answerType ?? "");
-    check(
-      n,
-      "multiple choice options",
-      JSON.stringify(splitOptions(cell(row, "choiceOptions"))),
-      JSON.stringify(comment.choiceOptions),
-    );
-    check(
-      n,
-      "unit options",
-      JSON.stringify(splitOptions(cell(row, "unitOptions"))),
-      JSON.stringify(comment.unitOptions),
-    );
-
-    const coreHeaders = new Set(
-      (Object.keys(CORE_COLUMNS) as CoreColumn[]).map(headerFor),
-    );
+    check(n, "multiple choice options", optionContent(cell(row, "choiceOptions")), optionContent(comment.choiceOptions.join("")));
+    check(n, "unit options", optionContent(cell(row, "unitOptions")), optionContent(comment.unitOptions.join("")));
     for (const [header, value] of Object.entries(row.cells)) {
       if (coreHeaders.has(header)) continue;
       check(n, header, value, comment.attributes[header] ?? "");

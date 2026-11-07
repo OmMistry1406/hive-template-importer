@@ -23,6 +23,9 @@ function poolDb(connectionString: string): Db {
     max: 3,
     ssl: isLocal ? false : ca ? { ca } : { rejectUnauthorized: false },
   });
+  // An idle connection dropped by the pooler emits "error"; unhandled, it would
+  // crash the server process.
+  pool.on("error", (error) => console.error("Idle database connection closed", error));
   const wrap = (c: Pool | PoolClient): Queryable => ({
     query: async <T,>(sql: string, params?: unknown[]) => {
       const result = await c.query(sql, params as unknown[]);
@@ -37,12 +40,15 @@ function poolDb(connectionString: string): Db {
         await client.query("begin");
         const value = await fn(wrap(client));
         await client.query("commit");
+        client.release();
         return value;
       } catch (error) {
-        await client.query("rollback");
+        let broken: Error | undefined;
+        await client.query("rollback").catch((rollbackError: Error) => {
+          broken = rollbackError;
+        });
+        client.release(broken);
         throw error;
-      } finally {
-        client.release();
       }
     },
   };

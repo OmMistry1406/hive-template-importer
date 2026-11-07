@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sanitizeForDisplay } from "@/lib/import/html";
-import { parseSpectoraExport, templateNameFromFile } from "@/lib/import/parse";
+import { decodeName, parseSpectoraExport, templateNameFromFile } from "@/lib/import/parse";
 import { ImportFailure } from "@/lib/import/types";
 import { HEADERS, makeXlsx, sampleBytes } from "./helpers";
 
@@ -150,6 +150,40 @@ describe("rich content from other exports", () => {
 
   it("blocks scriptable image sources", () => {
     expect(sanitizeForDisplay('<img src="javascript:alert(1)" onerror="x()">')).not.toMatch(/javascript|onerror/);
+  });
+});
+
+describe("text fidelity", () => {
+  it("decodes only complete entities in names", () => {
+    expect(decodeName("Doors &amp; Windows")).toBe("Doors & Windows");
+    expect(decodeName("Roof &notes &copy 2026")).toBe("Roof &notes &copy 2026");
+    expect(decodeName("A &#38; B &#x26; C")).toBe("A & B & C");
+  });
+
+  it("never decodes option lists, which the export does not escape", () => {
+    const parsed = parseSpectoraExport(
+      makeXlsx(HEADERS.slice(0, 7), [["A", "B", "C", "<p>t</p>", "info", "", "Knob & Tube, &amp; literal"]]),
+      "t.xlsx",
+    );
+    expect(parsed.sections[0].items[0].comments[0].choiceOptions).toEqual(["Knob & Tube", "&amp; literal"]);
+  });
+
+  it("decodes Excel escapes in shared strings and ignores phonetic text", async () => {
+    const { strToU8, zipSync } = await import("fflate");
+    const sheet = `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${[
+      HEADERS.slice(0, 4).map((_, i) => `<c r="${"ABCD"[i]}1" t="s"><v>${i}</v></c>`).join(""),
+      ["A", "B", "C", "D"].map((col, i) => `<c r="${col}2" t="s"><v>${4 + i}</v></c>`).join(""),
+    ].map((cells, r) => `<row r="${r + 1}">${cells}</row>`).join("")}</sheetData></worksheet>`;
+    const strings = [...HEADERS.slice(0, 4), "Roof", "Item", "Name", "line_x000D_two and _x005F_x000D_ kept"]
+      .map((s, i) => (i === 4 ? `<si><r><t>Ro</t></r><r><t>of</t></r><rPh><t>PHONETIC</t></rPh></si>` : `<si><t>${s}</t></si>`))
+      .join("");
+    const bytes = zipSync({
+      "xl/worksheets/sheet1.xml": strToU8(sheet),
+      "xl/sharedStrings.xml": strToU8(`<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${strings}</sst>`),
+    });
+    const parsed = parseSpectoraExport(bytes, "t.xlsx");
+    expect(parsed.sections[0].name).toBe("Roof");
+    expect(parsed.sections[0].items[0].comments[0].textHtml).toBe("line\rtwo and _x000D_ kept");
   });
 });
 

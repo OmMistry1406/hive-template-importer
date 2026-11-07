@@ -6,6 +6,8 @@ type XmlElement = {
   getElementsByTagName(name: string): ArrayLike<XmlElement>;
   getAttribute(name: string): string | null;
   textContent: string | null;
+  childNodes: ArrayLike<XmlElement>;
+  localName?: string | null;
 };
 
 export type Sheet = {
@@ -48,15 +50,25 @@ function parseXml(xml: string, part: string): XmlElement {
   }
 }
 
+// Excel writes characters XML cannot hold as _xHHHH_, and a literal "_x" as
+// "_x005F_x". Spectora's own export uses XML entities instead.
+const decodeOoxmlEscapes = (text: string) =>
+  text.replace(/_x([0-9A-Fa-f]{4})_/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+
+const children = (node: XmlElement, name: string) =>
+  Array.from(node.childNodes).filter((child) => child.localName === name);
+
+// Only the string's own runs count: phonetic guides (<rPh>) also contain <t>.
+function richText(node: XmlElement): string {
+  const runs = [...children(node, "t"), ...children(node, "r").flatMap((r) => children(r, "t"))];
+  return decodeOoxmlEscapes(runs.map((t) => t.textContent ?? "").join(""));
+}
+
 function sharedStrings(files: Record<string, Uint8Array>): string[] {
   const part = files["xl/sharedStrings.xml"];
   if (!part) return [];
   const root = parseXml(strFromU8(part), "shared strings");
-  return Array.from(root.getElementsByTagName("si")).map((si) =>
-    Array.from(si.getElementsByTagName("t"))
-      .map((t) => t.textContent ?? "")
-      .join(""),
-  );
+  return Array.from(root.getElementsByTagName("si")).map(richText);
 }
 
 function firstWorksheetPath(files: Record<string, Uint8Array>): string | null {
@@ -69,9 +81,8 @@ function firstWorksheetPath(files: Record<string, Uint8Array>): string | null {
 function cellValue(cell: XmlElement, shared: string[]): string {
   const type = cell.getAttribute("t");
   if (type === "inlineStr") {
-    return Array.from(cell.getElementsByTagName("t"))
-      .map((t) => t.textContent ?? "")
-      .join("");
+    const inline = cell.getElementsByTagName("is")[0];
+    return inline ? richText(inline) : "";
   }
   const raw = cell.getElementsByTagName("v")[0]?.textContent ?? "";
   if (type === "s") return shared[Number(raw)] ?? "";

@@ -43,16 +43,22 @@ export function CommentCard({
   async function saveText(html: string | null) {
     setEditing(false);
     if (html === null) return;
-    onChange({ textHtml: html, edited: comment.sourceRowId !== null });
-    await save(() => saveCommentText(comment.id, html));
+    const previous = { textHtml: comment.textHtml, edited: comment.edited };
+    const next = { textHtml: html, edited: comment.sourceRowId !== null };
+    onChange(next);
+    await save(`text:${comment.id}`, () => saveCommentText(comment.id, html), {
+      onSuccess: () => onChange(next),
+      onFailure: () => onChange(previous),
+    });
   }
 
   async function restore() {
-    const result = await save(() => restoreComment(comment.id));
-    if (result.ok) {
-      onChange({ name: result.value.name, textHtml: comment.importedTextHtml, edited: false });
-      setNameKey((k) => k + 1);
-    }
+    await save(`restore:${comment.id}`, () => restoreComment(comment.id), {
+      onSuccess: (value) => {
+        onChange({ name: value.name, textHtml: comment.importedTextHtml, edited: false });
+        setNameKey((k) => k + 1);
+      },
+    });
   }
 
   return (
@@ -67,9 +73,9 @@ export function CommentCard({
           label="Comment name"
           className="font-medium"
           onSave={async (name) => {
-            const result = await save(() => saveCommentName(comment.id, name));
-            if (result.ok) onChange({ name, edited: comment.sourceRowId !== null });
-            return result;
+            return save(`name:${comment.id}`, () => saveCommentName(comment.id, name), {
+              onSuccess: () => onChange({ name, edited: comment.sourceRowId !== null }),
+            });
           }}
         />
         {comment.edited && (
@@ -87,8 +93,10 @@ export function CommentCard({
             onChange={async (e) => {
               const next = e.target.value;
               onChange({ commentType: next });
-              const result = await save(() => saveCommentType(comment.id, next));
-              if (!result.ok) onChange({ commentType: type });
+              await save(`type:${comment.id}`, () => saveCommentType(comment.id, next), {
+                onSuccess: () => onChange({ commentType: next }),
+                onFailure: () => onChange({ commentType: type }),
+              });
             }}
             className={`mt-0.5 rounded border-0 px-1.5 py-0.5 text-xs font-medium capitalize ${TYPE_STYLE[type]}`}
           >
@@ -155,8 +163,7 @@ export function CommentCard({
               type="button"
               className="rounded bg-defect px-2 py-0.5 font-medium text-white"
               onClick={async () => {
-                const result = await save(() => removeComment(comment.id));
-                if (result.ok) onDeleted();
+                await save(`delete:${comment.id}`, () => removeComment(comment.id), { onSuccess: onDeleted });
               }}
             >
               Delete

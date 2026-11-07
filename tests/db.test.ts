@@ -62,6 +62,27 @@ describe("import", () => {
     expect(verifyStoredTemplate(t, rows, report.headers).ok).toBe(false);
   });
 
+  it("detects comments regrouped into the wrong item", async () => {
+    const t = await tree(templateId);
+    const rows = await getSourceRows(db, runId);
+    const report = (await getImportReport(db, runId))!;
+    const [first, second] = t.sections[1].items;
+    second.comments.unshift(first.comments.pop()!);
+    const result = verifyStoredTemplate(t, rows, report.headers);
+    expect(result.ok).toBe(false);
+    expect(result.mismatches.some((m) => m.field === "grouping")).toBe(true);
+  });
+
+  it("detects a merged item", async () => {
+    const t = await tree(templateId);
+    const rows = await getSourceRows(db, runId);
+    const report = (await getImportReport(db, runId))!;
+    const items = t.sections[1].items;
+    items[0].comments.push(...items[1].comments);
+    items.splice(1, 1);
+    expect(verifyStoredTemplate(t, rows, report.headers).ok).toBe(false);
+  });
+
   it("rolls back everything if the stored data fails verification", async () => {
     const before = await Promise.all(["import_runs", "templates", "comments"].map(count));
     const attempt = importSpectoraFile(db, sampleBytes(), "bad.xls", {

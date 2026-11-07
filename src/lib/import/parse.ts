@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import he from "he";
 import {
   ATTRIBUTE_COLUMNS,
   CORE_COLUMNS,
@@ -21,11 +20,25 @@ import {
 } from "./types";
 import { readWorkbook, type Sheet } from "./xlsx";
 
-// Names and option lists are HTML-escaped in the export ("Doors &amp; Windows").
-export const decodeName = (raw: string) => he.decode(raw);
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\u00a0" };
 
+// Section and item names arrive HTML-escaped ("Doors &amp; Windows"), so they
+// get one strict decode: only complete entities ending in ";" are touched.
+// Option lists are not escaped in the export ("Bradford & White") and are
+// never decoded.
+export const decodeName = (raw: string) =>
+  raw.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
+    if (body[0] === "#") {
+      const code = body[1] === "x" || body[1] === "X" ? parseInt(body.slice(2), 16) : Number(body.slice(1));
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    }
+    return NAMED_ENTITIES[body.toLowerCase()] ?? entity;
+  });
+
+// The export separates options with commas and has no escape for a comma
+// inside an option, so that ambiguity is inherent to the format.
 export const splitOptions = (raw: string) =>
-  decodeName(raw)
+  raw
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);

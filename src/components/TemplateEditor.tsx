@@ -7,6 +7,7 @@ import { createComment, saveItemName, saveSectionName, saveTemplateName } from "
 import type { CommentRow, ItemRow, SectionRow, TemplateTree } from "@/lib/db/templates";
 import { CommentCard } from "./CommentCard";
 import { InlineName } from "./InlineName";
+import { GettingStarted } from "./GettingStarted";
 import { CopyTemplateButton, DeleteTemplateButton } from "./TemplateButtons";
 import { useSaver, type SaveState } from "./useSaver";
 
@@ -25,7 +26,7 @@ function SaveIndicator({ state }: { state: SaveState }) {
   }
   return (
     <span role="alert" className="inline-flex items-center gap-1.5 text-sm text-defect">
-      <TriangleAlert className="size-3.5" /> Not saved. {state.error}
+      <TriangleAlert className="size-3.5" /> {state.count === 1 ? "1 change" : `${state.count} changes`} not saved. {state.error}
       <button type="button" onClick={state.retry} className="font-medium underline">Retry</button>
     </span>
   );
@@ -67,10 +68,14 @@ export function TemplateEditor({ template, focusCommentId }: { template: EditorT
     );
 
   async function addComment(itemId: string) {
-    const result = await save(() => createComment(itemId));
-    if (!result.ok) return;
+    await save(`add:${itemId}`, () => createComment(itemId), {
+      onSuccess: (id) => appendComment(itemId, id),
+    });
+  }
+
+  function appendComment(itemId: string, id: string) {
     const fresh: EditorComment = {
-      id: result.value, name: "New comment", textHtml: "", commentType: "defect", category: null,
+      id, name: "New comment", textHtml: "", commentType: "defect", category: null,
       recommendation: null, answerType: "boolean", choiceOptions: [], unitOptions: [], attributes: {},
       sourceRowId: null, importedName: null, importedTextHtml: null, edited: false,
     };
@@ -106,7 +111,7 @@ export function TemplateEditor({ template, focusCommentId }: { template: EditorT
               value={template.name}
               label="Template name"
               className="text-xl font-semibold tracking-tight"
-              onSave={(name) => save(() => saveTemplateName(template.id, name))}
+              onSave={(name) => save(`template:${template.id}`, () => saveTemplateName(template.id, name))}
             />
             {template.copiedFromName && <p className="text-sm text-muted">Copy of {template.copiedFromName}. Changes here do not affect it.</p>}
           </div>
@@ -120,6 +125,8 @@ export function TemplateEditor({ template, focusCommentId }: { template: EditorT
           <DeleteTemplateButton templateId={template.id} name={template.name} redirectTo="/templates" />
         </div>
       </div>
+
+      {template.importRunId && !template.copiedFromId && <GettingStarted templateId={template.id} />}
 
       <div className="mt-5 grid grid-cols-[260px_minmax(0,1fr)] gap-6">
         <aside className="sticky top-34 self-start">
@@ -167,9 +174,10 @@ export function TemplateEditor({ template, focusCommentId }: { template: EditorT
                   value={current.name}
                   label="Section name"
                   onSave={async (name) => {
-                    const result = await save(() => saveSectionName(current.id, name));
-                    if (result.ok) setSections((all) => all.map((s) => (s.id === current.id ? { ...s, name } : s)));
-                    return result;
+                    const id = current.id;
+                    return save(`section:${id}`, () => saveSectionName(id, name), {
+                      onSuccess: () => setSections((all) => all.map((s) => (s.id === id ? { ...s, name } : s))),
+                    });
                   }}
                 />
               </div>
@@ -180,11 +188,10 @@ export function TemplateEditor({ template, focusCommentId }: { template: EditorT
                       value={item.name}
                       label="Item name"
                       onSave={async (name) => {
-                        const result = await save(() => saveItemName(item.id, name));
-                        if (result.ok) {
-                          setSections((all) => all.map((s) => ({ ...s, items: s.items.map((i) => (i.id === item.id ? { ...i, name } : i)) })));
-                        }
-                        return result;
+                        return save(`item:${item.id}`, () => saveItemName(item.id, name), {
+                          onSuccess: () =>
+                            setSections((all) => all.map((s) => ({ ...s, items: s.items.map((i) => (i.id === item.id ? { ...i, name } : i)) }))),
+                        });
                       }}
                     />
                     <button type="button" onClick={() => addComment(item.id)} className="inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-sm font-normal text-muted hover:bg-surface hover:text-foreground">

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { strToU8, zipSync } from "fflate";
 
-export const SAMPLE_PATH = path.join(__dirname, "..", "samples", "InterNACHI-Residential-2026-11-06.xls");
+export const SAMPLE_PATH = path.resolve("samples", "InterNACHI-Residential-2026-11-06.xls");
 export const sampleBytes = () => new Uint8Array(readFileSync(SAMPLE_PATH));
 
 export const HEADERS = [
