@@ -110,6 +110,7 @@ Known remaining limit: if a file's `Order` truly disagrees with its row order, S
   - `copy_template` can be run only by `postgres` and `service_role`.
   - The seeded import verified 5,881 fields with no differences. The current verifier also checks structure, so a fresh import now reports 5,884 checks.
 - **Supabase public API, probed with the anon key:** reads return nothing, and inserts and `copy_template` calls are refused.
+- **Staying awake:** Supabase pauses free projects after about a week without activity. A daily Vercel Cron job (`vercel.json`) calls `/api/health`, which runs a real query, so the database stays active during review.
 - **Live deployment:**
   - A wrong file returns 422 with a reason.
   - A real import returns 201. I deleted that test import afterwards.

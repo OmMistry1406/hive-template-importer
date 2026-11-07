@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authConfig } from "@/lib/auth/config";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 
-const PUBLIC_PATHS = new Set(["/"]);
+// /api/health checks its own CRON_SECRET.
+const PUBLIC_PATHS = new Set(["/", "/api/health"]);
 
 export async function proxy(request: NextRequest) {
   if (PUBLIC_PATHS.has(request.nextUrl.pathname)) return NextResponse.next();

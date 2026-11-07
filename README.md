@@ -48,6 +48,7 @@ To try the schema on a local Supabase instead, start Docker and run `supabase st
 | `DEMO_USERNAME` | On Vercel | Reviewer sign-in name. |
 | `DEMO_PASSWORD` | On Vercel | Reviewer password. |
 | `SESSION_SECRET` | On Vercel | At least 32 characters; signs session cookies. |
+| `CRON_SECRET` | On Vercel | Authorises the daily `/api/health` call from Vercel Cron. |
 | `DATABASE_CA_CERT` | No | Supabase CA certificate, so TLS verifies the server. |
 
 On Vercel, the app refuses to start without `DATABASE_URL`, and refuses every sign-in until all three sign-in variables are set. It never falls back to the local defaults there. Credentials never belong in the repo; `.env*` files are ignored except `.env.example`.
