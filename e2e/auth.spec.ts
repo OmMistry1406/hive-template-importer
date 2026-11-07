@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { LOCAL_USER, signIn } from "./helpers";
 
+test("the home page is public and explains the product", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("moved without retyping");
+  await expect(page.locator("video source")).toHaveAttribute("src", "/media/walkthrough.mp4");
+  await page.getByRole("link", { name: "Sign in to explore" }).click();
+  await expect(page).toHaveURL(/\/login/);
+});
+
 test("signed-out visitors are sent to sign in, then back where they were", async ({ page }) => {
   await page.goto("/templates");
   await expect(page).toHaveURL(/\/login\?next=%2Ftemplates/);

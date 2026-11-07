@@ -3,8 +3,7 @@ import { AUTH_FILE } from "../playwright.config";
 import { SAMPLE, signIn, upload } from "./helpers";
 
 test("sign in and import the committed Spectora export", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/login/);
+  await page.goto("/login");
   await signIn(page);
   await expect(page).toHaveURL(/\/import$/, { timeout: 30000 });
   await expect(page.getByText("Signed in as reviewer")).toBeVisible();

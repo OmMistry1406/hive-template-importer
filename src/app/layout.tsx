@@ -48,6 +48,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 </form>
               </>
             )}
+            {!user && (
+              <Link href="/login" className="ml-auto rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
+                Sign in
+              </Link>
+            )}
           </div>
         </header>
         {children}
