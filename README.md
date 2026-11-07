@@ -34,6 +34,7 @@ Copy `.env.example` to `.env.local`, then set `DATABASE_URL` to the **Transactio
 
 ```sh
 npm run db:seed
+npm run db:check   # RLS on every table, function grants, seeded template verified
 npm run dev
 ```
 
