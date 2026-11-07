@@ -2,7 +2,7 @@
 
 Moves a Spectora template into an editable, structured database without losing the inspector's work. Upload an HTML-text export, review a row-by-row import report, then edit and copy the template.
 
-- **Live app:** _added after deployment_
+- **Live app:** https://hive-template-importer-theta.vercel.app (Vercel, with Supabase Postgres in `us-east-1`)
 - **Login:** none; the app opens on the seeded template
 - **Input file:** [`samples/InterNACHI-Residential-2026-11-06.xls`](samples/InterNACHI-Residential-2026-11-06.xls), Spectora's InterNACHI Residential template, exported with Export to spreadsheet, then Export HTML Text, on 2026-11-06. It is sample content with no customer data.
 

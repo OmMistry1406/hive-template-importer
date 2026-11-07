@@ -1,0 +1,9 @@
+.playwright
+.data
+.next
+test-results
+test-output
+playwright-report
+supabase/.temp
+.env*
+!.env.example

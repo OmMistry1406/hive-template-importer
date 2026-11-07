@@ -86,6 +86,9 @@ Known remaining limit: if a file's `Order` truly disagrees with its row order, S
 - **Mutation checks:** tests tamper with stored text and drop a comment, and confirm verification fails. Another confirms a failed import leaves row counts unchanged.
 - **Independent copies:** tests compare all content, confirm no IDs are shared, and edit each side to confirm the other is unchanged. Deleting the original leaves the copy intact.
 - **`npm run test:e2e`:** a headless browser uploads the real file, edits, reloads, copies and tries a bad file.
+- **`npm run db:check` on Supabase:** row level security is on for all 7 tables, and `copy_template` can be run only by `postgres` and `service_role`. The seeded import verified 5,881 fields with no differences.
+- **Supabase public API, probed with the anon key:** reads return nothing, and inserts and `copy_template` calls are refused.
+- **Live deployment:** a wrong file returns 422 with a reason, and a real import returns 201. I deleted that test import afterwards, so the live app holds only the seeded template.
 
 ## What I cut, and why
 
@@ -97,6 +100,7 @@ Known remaining limit: if a file's `Order` truly disagrees with its row order, S
 - **Copying default photos.** The sample has none, so I could not test it. Flagged instead.
 - **Conflict detection between two open tabs.** Last save wins. Acceptable for one user; real teams need it.
 - **Rate limiting** on the public demo.
+- **Verified TLS to the database.** The connection is encrypted, but the server certificate is checked only if `DATABASE_CA_CERT` is set. I did not set it for the demo.
 - **AI features.** See the top of this file.
 
 ## Hive and Binsr
