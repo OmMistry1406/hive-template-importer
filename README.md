@@ -78,7 +78,9 @@ npm run lint
 ```sh
 npm run build
 DATABASE_URL= DEMO_USERNAME= DEMO_PASSWORD= SESSION_SECRET= PGLITE_DIR=.data/demo npx next start -p 3200
-npx tsx scripts/record-demo.ts
+npx tsx scripts/record-demo.ts            # records, narrates with Windows text-to-speech, cuts long pauses
+npx tsx scripts/record-demo.ts --remix    # rebuilds from the last recording
+npx tsx scripts/make-final-video.ts       # joins submission/intro.* and submission/voice.* into the final video
 ```
 
 ## Layout

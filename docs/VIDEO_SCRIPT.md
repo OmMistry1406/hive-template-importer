@@ -2,7 +2,7 @@
 
 Target 9 to 10 minutes, follow Hive's outline. Camera on for part 1. Record your screen with OBS or a Zoom call to yourself, then upload to YouTube as unlisted.
 
-`public/media/walkthrough.mp4` is a captioned, AI-narrated 4-minute product demo. It uses a synthetic voice, so it is not a substitute for your own narration. Use it as a backup, or play it during part 2 while you talk over it.
+`public/media/walkthrough.mp4` is a captioned, AI-narrated 6-minute product demo. It uses a synthetic voice, so it is not a substitute for your own narration. Use it as a backup, or play it during part 2 while you talk over it.
 
 ## 1. You (30 seconds, camera on)
 
