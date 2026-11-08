@@ -68,7 +68,7 @@ export default async function Home() {
             <source src="/media/walkthrough.mp4" type="video/mp4" />
           </video>
           <figcaption className="border-t border-line px-4 py-2 text-sm text-muted">
-            Walkthrough, 6 minutes, AI-narrated: import, verification report, editing, copying and a failure case.
+            Walkthrough, 8 minutes: the demo, the repo, the data model, decisions and the hardest problem.
           </figcaption>
         </figure>
       </section>

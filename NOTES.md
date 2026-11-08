@@ -155,7 +155,7 @@ I used Claude Code throughout:
 - Read the brief and both products' docs.
 - Profile the export.
 - Write the code and tests.
-- Record the demo video with a Playwright script.
+- Record the screen demo with a Playwright script, then fit it to my own recorded narration and camera intro.
 
 A second agent did an independent code review, and its findings are listed above. I reviewed the decisions and am responsible for the result. Reusable pieces:
 
