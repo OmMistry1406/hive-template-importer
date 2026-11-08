@@ -87,7 +87,7 @@ function finalize(webmPath: string) {
       "Read each line below, in order, into ONE audio recording.",
       "Leave about 3 seconds of silence between lines. Speak calmly and clearly.",
       "If you make a mistake, pause 3 seconds and read that line again. Afterwards, tell me which line numbers you repeated.",
-      "Line 27 (Feedback for Hive) can be changed to your own words about what you saw in Hive.",
+      "Line 26 (Feedback for Hive) can be changed to your own words about what you saw in Hive.",
       "",
       ...shifted.map((c, i) => `${String(i + 1).padStart(2, "0")}. ${c.text}`),
     ].join("\r\n"),
